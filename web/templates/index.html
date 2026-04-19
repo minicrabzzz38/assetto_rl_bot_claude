@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AC RL Bot — Claude</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0d1117;
+    --sidebar:  #161b22;
+    --card:     #21262d;
+    --border:   #30363d;
+    --text:     #e6edf3;
+    --muted:    #8b949e;
+    --blue:     #58a6ff;
+    --green:    #3fb950;
+    --orange:   #e3b341;
+    --red:      #f85149;
+    --purple:   #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 220px; min-width: 220px; background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 20px 0;
+  }
+  #sidebar .logo {
+    padding: 0 20px 24px; font-size: 14px; font-weight: 700; color: var(--blue);
+    border-bottom: 1px solid var(--border); letter-spacing: .5px;
+  }
+  #sidebar .logo span { color: var(--muted); font-weight: 400; display: block; font-size: 11px; margin-top: 3px; }
+  #sidebar nav { flex: 1; padding: 12px 0; }
+  #sidebar nav a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px; color: var(--muted); text-decoration: none;
+    font-size: 13px; border-left: 3px solid transparent; transition: all .15s;
+  }
+  #sidebar nav a:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  #sidebar nav a.active { color: var(--blue); border-left-color: var(--blue); background: rgba(88,166,255,.08); }
+  #sidebar nav a .icon { font-size: 15px; width: 18px; text-align: center; }
+
+  /* Status pills */
+  #sidebar .status-box { padding: 16px 20px; border-top: 1px solid var(--border); }
+  #sidebar .status-box h4 { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+  .pill { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.err { background: var(--red); }
+
+  /* ── Main ── */
+  #main { flex: 1; overflow-y: auto; padding: 28px 32px; }
+  section { display: none; }
+  section.active { display: block; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  /* Cards */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 18px; }
+  .card h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 14px; }
+
+  /* Stat row */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .stat .val { font-size: 26px; font-weight: 700; color: var(--blue); }
+  .stat .lbl { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; }
+  .btn-primary  { background: var(--blue);   color: #000; }
+  .btn-success  { background: var(--green);  color: #000; }
+  .btn-danger   { background: var(--red);    color: #fff; }
+  .btn-warning  { background: var(--orange); color: #000; }
+  .btn-muted    { background: var(--border); color: var(--text); }
+  .btn:hover { opacity: .85; transform: translateY(-1px); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+
+  /* Log terminal */
+  .terminal {
+    background: #010409; border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px; font-family: "Cascadia Code", "Fira Code", monospace;
+    font-size: 12px; line-height: 1.6; color: #b9c8d9;
+    height: 340px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .terminal .line-ok   { color: var(--green); }
+  .terminal .line-err  { color: var(--red); }
+  .terminal .line-warn { color: var(--orange); }
+  .terminal .line-info { color: var(--blue); }
+
+  /* Forms / inputs */
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 12px; color: var(--muted); }
+  .form-group input, .form-group select, textarea.yaml-editor {
+    background: #010409; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 12px; font-size: 13px; outline: none;
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--blue); }
+  textarea.yaml-editor {
+    font-family: "Cascadia Code", monospace; font-size: 12px;
+    width: 100%; height: 320px; resize: vertical; line-height: 1.5;
+  }
+  .tab-bar { display: flex; gap: 2px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .15s; }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid #1c2128; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-green  { background: rgba(63,185,80,.15);  color: var(--green); }
+  .badge-red    { background: rgba(248,81,73,.15);   color: var(--red); }
+  .badge-orange { background: rgba(227,179,65,.15);  color: var(--orange); }
+
+  /* Chart container */
+  .chart-wrap { position: relative; height: 220px; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+
+  .notice { background: rgba(88,166,255,.08); border: 1px solid rgba(88,166,255,.3); border-radius: 6px; padding: 12px 16px; font-size: 13px; color: var(--blue); margin-bottom: 16px; }
+  .warn-box { background: rgba(227,179,65,.08); border: 1px solid rgba(227,179,65,.3); border-radius: 6px; padding: 12px 16px; font-size: 13px; color: var(--orange); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+<div id="sidebar">
+  <div class="logo">
+    🏎 AC RL Bot
+    <span>assetto_rl_bot_claude</span>
+  </div>
+  <nav>
+    <a href="#" class="active" onclick="nav('dashboard',this)">   <span class="icon">📊</span> Dashboard</a>
+    <a href="#" onclick="nav('training',this)">   <span class="icon">🧠</span> Entraînement</a>
+    <a href="#" onclick="nav('evaluate',this)">   <span class="icon">🏁</span> Évaluation</a>
+    <a href="#" onclick="nav('bridge',this)">     <span class="icon">🔌</span> Test Bridge</a>
+    <a href="#" onclick="nav('config',this)">     <span class="icon">⚙️</span> Configuration</a>
+    <a href="#" onclick="nav('logs',this)">       <span class="icon">📋</span> Logs</a>
+  </nav>
+  <div class="status-box">
+    <h4>Statut</h4>
+    <div class="pill"><div class="dot" id="dot-train"></div><span id="lbl-train">Training inactif</span></div>
+    <div class="pill"><div class="dot" id="dot-eval"></div><span id="lbl-eval">Eval inactive</span></div>
+    <div class="pill"><div class="dot" id="dot-test"></div><span id="lbl-test">Bridge test —</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MAIN ═══════════════════════ -->
+<div id="main">
+
+  <!-- ── DASHBOARD ── -->
+  <section id="sec-dashboard" class="active">
+    <h1>Dashboard</h1>
+    <p class="subtitle">Vue d'ensemble de l'agent en temps réel.</p>
+    <div class="stats-row" id="stat-row">
+      <div class="stat"><div class="val" id="s-episodes">—</div><div class="lbl">Épisodes</div></div>
+      <div class="stat"><div class="val" id="s-reward">—</div><div class="lbl">Reward moy.</div></div>
+      <div class="stat"><div class="val" id="s-laps">—</div><div class="lbl">Tours valides</div></div>
+      <div class="stat"><div class="val" id="s-bestlap">—</div><div class="lbl">Meilleur tour</div></div>
+    </div>
+    <div class="charts-row">
+      <div class="card"><h3>Reward par épisode</h3><div class="chart-wrap"><canvas id="chart-reward"></canvas></div></div>
+      <div class="card"><h3>Meilleur tour (ms)</h3><div class="chart-wrap"><canvas id="chart-lap"></canvas></div></div>
+    </div>
+    <div class="card">
+      <h3>Actions rapides</h3>
+      <div class="btn-row">
+        <button class="btn btn-success" onclick="quickTrain()">▶ Démarrer l'entraînement</button>
+        <button class="btn btn-danger"  onclick="stopTrain()">⏹ Stop training</button>
+        <button class="btn btn-primary" onclick="nav('bridge',null);startTest()">🔌 Tester le bridge</button>
+        <button class="btn btn-muted"   onclick="refreshCharts()">↻ Refresh</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ENTRAÎNEMENT ── -->
+  <section id="sec-training">
+    <h1>Entraînement</h1>
+    <p class="subtitle">Lance, arrête et surveille le training SAC.</p>
+    <div class="warn-box">⚠ Assetto Corsa doit être ouvert en mode Pratique avant de démarrer.</div>
+    <div class="card">
+      <h3>Paramètres de lancement</h3>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="form-group">
+          <label>Nombre de pas (timesteps)</label>
+          <input type="number" id="tr-steps" value="1000000" step="50000">
+        </div>
+        <div class="form-group">
+          <label>Device</label>
+          <select id="tr-device">
+            <option value="auto">auto (CUDA si dispo)</option>
+            <option value="cuda">cuda (GPU)</option>
+            <option value="cpu">cpu</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-success" id="btn-train-start" onclick="startTrain(false)">▶ Démarrer</button>
+        <button class="btn btn-warning" id="btn-train-resume" onclick="startTrain(true)">↩ Reprendre</button>
+        <button class="btn btn-danger"  id="btn-train-stop"  onclick="stopTrain()">⏹ Arrêter</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Console — sortie training</h3>
+      <div class="terminal" id="log-training">En attente du démarrage...</div>
+    </div>
+  </section>
+
+  <!-- ── ÉVALUATION ── -->
+  <section id="sec-evaluate">
+    <h1>Évaluation</h1>
+    <p class="subtitle">Lance un agent entraîné en mode déterministe et mesure ses performances.</p>
+    <div class="card">
+      <h3>Paramètres</h3>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="form-group">
+          <label>Modèle</label>
+          <select id="ev-model"><option value="models/best">models/best</option><option value="models/latest">models/latest</option></select>
+        </div>
+        <div class="form-group">
+          <label>Nombre d'épisodes</label>
+          <input type="number" id="ev-episodes" value="10" min="1" max="100">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="startEval()">▶ Lancer l'évaluation</button>
+        <button class="btn btn-danger"  onclick="stopEval()">⏹ Arrêter</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Console</h3>
+      <div class="terminal" id="log-eval">En attente...</div>
+    </div>
+    <div class="card">
+      <h3>Résultats (dernier fichier eval)</h3>
+      <div style="overflow-x:auto"><table id="results-table">
+        <thead><tr><th>#</th><th>Steps</th><th>Reward</th><th>Tours</th><th>Valides</th><th>Invalides</th><th>Meilleur tour</th><th>Off-track</th><th>Fin</th></tr></thead>
+        <tbody id="results-body"><tr><td colspan="9" style="color:var(--muted);text-align:center">Cliquer sur "Charger résultats"</td></tr></tbody>
+      </table></div>
+      <br><button class="btn btn-muted" onclick="loadResults()">↻ Charger résultats</button>
+    </div>
+  </section>
+
+  <!-- ── BRIDGE TEST ── -->
+  <section id="sec-bridge">
+    <h1>Test Bridge</h1>
+    <p class="subtitle">Vérifie la connexion à Assetto Corsa et teste les contrôles virtuels.</p>
+    <div class="notice">🔌 AC doit être ouvert avec une session active (mode Pratique).</div>
+    <div class="card">
+      <h3>Options</h3>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="form-group">
+          <label>Backend contrôle</label>
+          <select id="test-backend">
+            <option value="vgamepad">vgamepad (Xbox virtuel)</option>
+            <option value="keyboard">keyboard (fallback)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Mode</label>
+          <select id="test-noctrl">
+            <option value="">Tester télémétrie + contrôles</option>
+            <option value="noctl">Télémétrie seulement</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-test" onclick="startTest()">▶ Lancer le test</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Sortie</h3>
+      <div class="terminal" id="log-test">En attente...</div>
+    </div>
+  </section>
+
+  <!-- ── CONFIG ── -->
+  <section id="sec-config">
+    <h1>Configuration</h1>
+    <p class="subtitle">Modifie les fichiers YAML directement depuis le navigateur.</p>
+    <div class="tab-bar">
+      <div class="tab active" onclick="cfgTab('default',this)">default.yaml</div>
+      <div class="tab" onclick="cfgTab('sac',this)">sac_config.yaml</div>
+      <div class="tab" onclick="cfgTab('env',this)">env_config.yaml</div>
+    </div>
+    <div class="card">
+      <div id="cfg-loading" style="color:var(--muted);font-size:13px">Chargement...</div>
+      <textarea class="yaml-editor" id="cfg-editor" style="display:none"></textarea>
+      <br>
+      <div class="btn-row" id="cfg-btns" style="display:none">
+        <button class="btn btn-success" onclick="saveCfg()">💾 Sauvegarder</button>
+        <button class="btn btn-muted"   onclick="loadCfg()">↻ Recharger</button>
+      </div>
+      <div id="cfg-msg" style="font-size:12px;margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- ── LOGS ── -->
+  <section id="sec-logs">
+    <h1>Logs</h1>
+    <p class="subtitle">Fichiers CSV de sessions d'entraînement et d'évaluation.</p>
+    <div class="card">
+      <h3>Fichiers disponibles</h3>
+      <div id="log-files-list" style="font-size:13px;color:var(--muted)">Chargement...</div>
+      <br><button class="btn btn-muted" onclick="loadLogFiles()">↻ Actualiser</button>
+    </div>
+  </section>
+
+</div><!-- /main -->
+
+<script>
+/* ═══════════════════════════════════════════════
+   Navigation
+═══════════════════════════════════════════════ */
+function nav(id, el) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  if (el) el.classList.add('active');
+  if (id === 'config')    { loadCfg(); }
+  if (id === 'evaluate')  { loadModels(); }
+  if (id === 'logs')      { loadLogFiles(); }
+  if (id === 'dashboard') { refreshCharts(); }
+}
+
+/* ═══════════════════════════════════════════════
+   Status polling
+═══════════════════════════════════════════════ */
+let statusInterval;
+function startStatusPoll() {
+  statusInterval = setInterval(async () => {
+    try {
+      const r = await fetch('/api/status');
+      const s = await r.json();
+      setDot('train', s.training,   s.training  ? 'Training actif'   : 'Training inactif');
+      setDot('eval',  s.evaluating, s.evaluating ? 'Eval en cours'    : 'Eval inactive');
+      setDot('test',  s.testing,    s.testing    ? 'Bridge test actif' : 'Bridge test —');
+    } catch {}
+  }, 2000);
+}
+function setDot(name, on, label) {
+  const d = document.getElementById('dot-'+name);
+  const l = document.getElementById('lbl-'+name);
+  d.className = 'dot' + (on ? ' on' : '');
+  l.textContent = label;
+}
+startStatusPoll();
+
+/* ═══════════════════════════════════════════════
+   SSE log streaming
+═══════════════════════════════════════════════ */
+const _sse = {};
+function streamLogs(name, terminalId) {
+  if (_sse[name]) { _sse[name].close(); }
+  const term = document.getElementById(terminalId);
+  term.innerHTML = '';
+  const es = new EventSource('/api/stream/' + name);
+  _sse[name] = es;
+  es.onmessage = e => {
+    const line = e.data;
+    if (line === '[done]') { es.close(); return; }
+    const div = document.createElement('div');
+    const lo = line.toLowerCase();
+    if      (lo.includes('error') || lo.includes('failed') || lo.includes('exception')) div.className='line-err';
+    else if (lo.includes('warn'))   div.className='line-warn';
+    else if (lo.includes('pass') || lo.includes('success') || lo.includes('saved') || lo.includes('valid lap')) div.className='line-ok';
+    else if (lo.includes('info') || lo.includes('==='))  div.className='line-info';
+    div.textContent = line;
+    term.appendChild(div);
+    term.scrollTop = term.scrollHeight;
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   Training
+═══════════════════════════════════════════════ */
+async function startTrain(resume) {
+  const steps  = document.getElementById('tr-steps').value;
+  const device = document.getElementById('tr-device').value;
+  await fetch('/api/train/start', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ resume, timesteps: parseInt(steps), device })
+  });
+  setTimeout(() => streamLogs('training', 'log-training'), 300);
+}
+function quickTrain() { nav('training', document.querySelector('#sidebar nav a:nth-child(2)')); startTrain(false); }
+async function stopTrain() {
+  await fetch('/api/train/stop', {method:'POST'});
+}
+
+/* ═══════════════════════════════════════════════
+   Evaluation
+═══════════════════════════════════════════════ */
+async function startEval() {
+  const model    = document.getElementById('ev-model').value;
+  const episodes = document.getElementById('ev-episodes').value;
+  await fetch('/api/eval/start', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ model, episodes: parseInt(episodes) })
+  });
+  setTimeout(() => streamLogs('eval', 'log-eval'), 300);
+}
+async function stopEval() { await fetch('/api/eval/stop', {method:'POST'}); }
+
+async function loadModels() {
+  const r = await fetch('/api/models'); const models = await r.json();
+  const sel = document.getElementById('ev-model');
+  sel.innerHTML = '';
+  ['models/best','models/latest'].forEach(m => {
+    const o = document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
+  });
+  models.forEach(m => {
+    if (m==='best'||m==='latest') return;
+    const o = document.createElement('option'); o.value='models/'+m; o.textContent='models/'+m; sel.appendChild(o);
+  });
+}
+
+async function loadResults() {
+  const r = await fetch('/api/results'); const rows = await r.json();
+  const tbody = document.getElementById('results-body');
+  if (!rows.length) { tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted);text-align:center">Aucun résultat trouvé</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => {
+    const lap = r.best_lap_s > 0 ? r.best_lap_s+'s' : '—';
+    const validBadge  = `<span class="badge badge-green">${r.valid_laps}</span>`;
+    const invBadge    = r.invalid_laps>0 ? `<span class="badge badge-red">${r.invalid_laps}</span>` : '0';
+    const endBadge    = r.terminal_reason ? `<span class="badge badge-orange">${r.terminal_reason}</span>` : '<span class="badge badge-green">ok</span>';
+    return `<tr><td>${r.episode}</td><td>${r.steps}</td><td>${parseFloat(r.total_reward).toFixed(1)}</td>
+      <td>${r.laps_completed}</td><td>${validBadge}</td><td>${invBadge}</td>
+      <td>${lap}</td><td>${r.off_track_events}</td><td>${endBadge}</td></tr>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   Bridge test
+═══════════════════════════════════════════════ */
+async function startTest() {
+  const backend   = document.getElementById('test-backend').value;
+  const no_control = document.getElementById('test-noctrl').value === 'noctl';
+  await fetch('/api/test/start', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ backend, no_control })
+  });
+  setTimeout(() => streamLogs('test', 'log-test'), 300);
+}
+
+/* ═══════════════════════════════════════════════
+   Config editor
+═══════════════════════════════════════════════ */
+let _currentCfg = 'default';
+function cfgTab(name, el) {
+  document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  _currentCfg = name;
+  loadCfg();
+}
+async function loadCfg() {
+  const loading = document.getElementById('cfg-loading');
+  const editor  = document.getElementById('cfg-editor');
+  const btns    = document.getElementById('cfg-btns');
+  loading.style.display='block'; editor.style.display='none'; btns.style.display='none';
+  try {
+    const r = await fetch('/api/config/' + _currentCfg + '/raw');
+    const txt = await r.text();
+    editor.value = txt;
+    loading.style.display='none'; editor.style.display='block'; btns.style.display='flex';
+  } catch(e) {
+    loading.textContent = 'Erreur de chargement: ' + e;
+  }
+}
+async function saveCfg() {
+  const text = document.getElementById('cfg-editor').value;
+  const msg  = document.getElementById('cfg-msg');
+  try {
+    const r = await fetch('/api/config/' + _currentCfg + '/raw', {
+      method:'POST', body: text, headers:{'Content-Type':'text/plain'}
+    });
+    const d = await r.json();
+    if (d.ok) { msg.style.color='var(--green)'; msg.textContent='✓ Sauvegardé avec succès'; }
+    else       { msg.style.color='var(--red)';   msg.textContent='✗ Erreur: ' + (d.error||'?'); }
+  } catch(e) { msg.style.color='var(--red)'; msg.textContent='✗ ' + e; }
+  setTimeout(()=>msg.textContent='', 3000);
+}
+
+/* ═══════════════════════════════════════════════
+   Logs
+═══════════════════════════════════════════════ */
+async function loadLogFiles() {
+  const r = await fetch('/api/logfiles'); const files = await r.json();
+  const el = document.getElementById('log-files-list');
+  if (!files.length) { el.textContent = 'Aucun fichier log trouvé.'; return; }
+  el.innerHTML = files.map(f => {
+    const isEval = f.startsWith('eval_');
+    const badge = isEval
+      ? '<span class="badge badge-orange">eval</span>'
+      : '<span class="badge badge-green">train</span>';
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">${badge} <span style="color:var(--text)">${f}</span></div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   Charts — Dashboard
+═══════════════════════════════════════════════ */
+let chartReward, chartLap;
+
+function buildCharts() {
+  const chartCfg = (label, color) => ({
+    type: 'line',
+    data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color+'22', borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#8b949e', maxTicksLimit: 8 }, grid: { color:'#21262d' } },
+        y: { ticks: { color:'#8b949e' },                   grid: { color:'#21262d' } }
+      }
+    }
+  });
+  chartReward = new Chart(document.getElementById('chart-reward'), chartCfg('Reward','#58a6ff'));
+  chartLap    = new Chart(document.getElementById('chart-lap'),    chartCfg('Best Lap (ms)','#3fb950'));
+}
+
+async function refreshCharts() {
+  try {
+    const r = await fetch('/api/training_log'); const rows = await r.json();
+    if (!rows.length) return;
+    const labels  = rows.map(r => 'Ep ' + r.episode);
+    const rewards = rows.map(r => parseFloat(r.total_reward) || 0);
+    const laps    = rows.map(r => parseInt(r.best_lap_ms)    || 0).filter(v=>v>0);
+    const lapLbls = rows.filter(r=>parseInt(r.best_lap_ms)>0).map(r=>'Ep '+r.episode);
+
+    chartReward.data.labels = labels; chartReward.data.datasets[0].data = rewards; chartReward.update();
+    chartLap.data.labels = lapLbls;  chartLap.data.datasets[0].data = laps;        chartLap.update();
+
+    // update stat cards
+    const total = rows.length;
+    const avgR  = (rewards.reduce((a,b)=>a+b,0)/total).toFixed(1);
+    const validLaps = rows.reduce((a,r)=>a+(parseInt(r.laps_completed)||0),0);
+    const bestLap   = laps.length ? (Math.min(...laps)/1000).toFixed(3)+'s' : '—';
+    document.getElementById('s-episodes').textContent = total;
+    document.getElementById('s-reward').textContent   = avgR;
+    document.getElementById('s-laps').textContent     = validLaps;
+    document.getElementById('s-bestlap').textContent  = bestLap;
+  } catch {}
+}
+
+buildCharts();
+refreshCharts();
+setInterval(refreshCharts, 10000);
+</script>
+</body>
+</html>

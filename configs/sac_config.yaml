@@ -1,0 +1,18 @@
+# =============================================================================
+# SAC Hyperparameters
+# Merges on top of default.yaml — only override what you need here.
+# =============================================================================
+
+sac:
+  learning_rate:   0.0003       # 3e-4 is standard for SAC
+  buffer_size:     300_000      # replay buffer capacity (steps)
+  batch_size:      256          # mini-batch size for gradient updates
+  tau:             0.005        # soft update coefficient for target network
+  gamma:           0.99         # discount factor
+  ent_coef:        auto         # entropy coefficient ('auto' = learned)
+  learning_starts: 1000         # steps before first gradient update
+  train_freq:      1            # update every N steps
+  gradient_steps:  1            # gradient updates per env step
+  policy:          MlpPolicy    # 'MlpPolicy' for vector obs (no CNN needed)
+  policy_kwargs:
+    net_arch: [256, 256]        # actor and critic hidden layers

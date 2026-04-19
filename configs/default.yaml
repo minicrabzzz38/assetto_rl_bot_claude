@@ -1,0 +1,38 @@
+# =============================================================================
+# assetto_rl_bot_claude — Master Configuration
+# =============================================================================
+
+# --- Training ---
+training:
+  algorithm:        sac           # 'sac' or 'ppo'
+  total_timesteps:  1_000_000
+  checkpoint_freq:  10_000        # steps between checkpoint saves
+  log_interval:     1             # SB3 log every N episodes
+  tensorboard_log:  logs/tb
+  run_name:         run_01
+  device:           auto          # 'auto', 'cpu', or 'cuda'
+
+# --- Environment ---
+env:
+  control_backend:  vgamepad      # 'vgamepad' or 'keyboard'
+  step_delay:       0.05          # seconds per step (~20 Hz)
+  connect_timeout:  60.0          # seconds to wait for AC to start
+
+# --- Paths ---
+paths:
+  models_dir:  models
+  logs_dir:    logs
+  checkpoint:  models/latest
+  best_model:  models/best
+
+# --- Reset (game restart) ---
+reset:
+  esc_wait:       1.5     # seconds after pressing ESC
+  confirm_key:    "r"     # key to confirm restart in the AC menu
+  confirm_wait:   4.0     # seconds to wait after confirm (loading time)
+
+# --- Evaluation ---
+eval:
+  num_episodes:    10
+  deterministic:   true
+  results_file:    logs/eval_results.csv

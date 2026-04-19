@@ -1,0 +1,32 @@
+# =============================================================================
+# Environment & Reward Configuration
+# =============================================================================
+
+episode:
+  # Termination thresholds
+  damage_threshold:       80.0   # sum of carDamage[0..4] to trigger crash terminal
+  off_track_timeout:       4.0   # seconds with >= 3 tyres out before reset
+  stuck_speed_kmh:         2.0   # km/h below which car is "potentially stuck"
+  stuck_timeout:           8.0   # seconds below stuck_speed before reset
+  backwards_threshold:     0.05  # lap progress drop amount = going backwards
+
+reward:
+  # Positive weights
+  speed_weight:          0.003   # per km/h
+  progress_weight:       5.0     # per normalizedCarPosition unit gained
+  valid_lap_bonus:       200.0   # clean lap completion bonus
+  smoothness_weight:     0.05    # reward for stable steering
+
+  # Negative weights (penalties)
+  tyre_out_weight:       2.0     # per tyre out per step
+  damage_weight:         0.3     # per damage point (incremental)
+  yaw_rate_weight:       0.08    # per rad/s yaw rate
+  stuck_penalty:         0.5     # per step when stuck
+  invalid_lap_penalty:   5.0     # per step while lap is invalid
+  terminal_crash_penalty: 50.0   # one-time on crash termination
+  terminal_stuck_penalty: 20.0   # one-time on stuck termination
+  backwards_penalty:     1.5     # per step when going backwards
+
+observation:
+  max_speed_kmh:  300.0
+  max_rpm:        8000.0         # fallback if AC static data unavailable

@@ -26,7 +26,10 @@ def get_logger(name: str = "ac_bot", level: int = logging.INFO) -> logging.Logge
         return logger  # already configured
 
     logger.setLevel(level)
-    handler = logging.StreamHandler(sys.stdout)
+    # Force UTF-8 on Windows to avoid cp1252 UnicodeEncodeError
+    stream = open(sys.stdout.fileno(), mode="w", encoding="utf-8", buffering=1, closefd=False) \
+        if hasattr(sys.stdout, "fileno") else sys.stdout
+    handler = logging.StreamHandler(stream)
     handler.setLevel(level)
 
     if _COLORLOG:

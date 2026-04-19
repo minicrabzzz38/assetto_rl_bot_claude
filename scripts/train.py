@@ -149,10 +149,10 @@ def main():
     logger.info("Starting training | total_timesteps=%d | device=%s", total_timesteps, device)
     logger.info(
         "Make sure Assetto Corsa is:\n"
-        "  → Running in Practice mode\n"
-        "  → No opponents\n"
-        "  → Automatic gearbox enabled\n"
-        "  → Virtual controller configured (if using vgamepad)\n"
+        "  -> Running in Practice mode\n"
+        "  -> No opponents\n"
+        "  -> Automatic gearbox enabled\n"
+        "  -> Virtual controller configured (if using vgamepad)\n"
     )
 
     try:
